@@ -12,10 +12,19 @@ class ViewController: UIViewController, AVAudioPlayerDelegate, AVAudioRecorderDe
 
     @IBOutlet weak var playButton: UIButton!
     @IBOutlet weak var recordButton: UIButton!
+    @IBOutlet weak var timerLabel: UILabel!
+    @IBOutlet weak var timerCounterLabel: UILabel!
+    @IBOutlet weak var fileNameLabel: UILabel!
     
-    var filename: String = "audioFile"
-    var counter: Int = 1
+    var totalTime = 10
+    var timeLeft = 10
+    var timer : Timer!
+    var isRunning = false
+    
+    var filename: String = "audioRecorded"
+    var counter: Int = 0
     let format: String = ".wav"
+    var selectedAudio : URL!
     
     var soundPlay : AVAudioPlayer!
     var recordingSession : AVAudioSession!
@@ -44,7 +53,6 @@ class ViewController: UIViewController, AVAudioPlayerDelegate, AVAudioRecorderDe
         catch {
             print("Error")
         }
-        setupRecorder()
     }
 
     func setupRecorder(){
@@ -56,7 +64,7 @@ class ViewController: UIViewController, AVAudioPlayerDelegate, AVAudioRecorderDe
         
         var error : NSError?
         
-        let audioName = getDocumentDirectory().appendingPathComponent(filename)
+        let audioName = getFileName()
         
         do{
             soundRecord = try AVAudioRecorder(url: audioName, settings: recordSettings)
@@ -80,10 +88,11 @@ class ViewController: UIViewController, AVAudioPlayerDelegate, AVAudioRecorderDe
     func preparePlayer(){
         var error: NSError?
         
-        let audioName = getFileName()
-                
+        let audioName = selectedAudio
+        
+        print(audioName!)
         do{
-            soundPlay = try AVAudioPlayer(contentsOf: audioName)
+            soundPlay = try AVAudioPlayer(contentsOf: audioName!)
         }
         catch let error1 as NSError{
             error = error1
@@ -100,6 +109,28 @@ class ViewController: UIViewController, AVAudioPlayerDelegate, AVAudioRecorderDe
         }
     }
     
+    func runTimer(_ sender: String){
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            if self.timeLeft != 0 {
+                self.timeLeft -= 1
+                self.timerLabel.text = "\(self.timeLeft)"
+            }
+            else{
+                timer.invalidate()
+                if sender == "Record" {
+                    self.soundRecord.stop()
+                    self.recordButton.setTitle("Record", for: .normal)
+                    self.playButton.isEnabled = true
+                }
+                else if sender == "Play" {
+                    self.soundPlay.stop()
+                    self.playButton.setTitle("Play", for: .normal)
+                    self.recordButton.isEnabled = true
+                }
+            }
+        }
+    }
+    
     func getDocumentDirectory() -> URL {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
         return paths[0]
@@ -111,27 +142,32 @@ class ViewController: UIViewController, AVAudioPlayerDelegate, AVAudioRecorderDe
         do {
             let filesInDirectory = try FileManager.default.contentsOfDirectory(at: getDocumentDirectory(), includingPropertiesForKeys: nil)
             while filesInDirectory.contains(audioName){
-                filename += String(counter)
-                file = filename + format
+                counter+=1
+                file = filename + String(counter) + format
                 audioName = getDocumentDirectory().appendingPathComponent(file)
-                counter += 1
             }
-            print(audioName)
         }
         catch let error{
             print(error)
         }
+        selectedAudio = audioName
+        fileNameLabel.text = file
         return audioName
     }
     
-    @IBAction	 func playSession(_ sender: UIButton) {
+    @IBAction func playSession(_ sender: UIButton) {
         if sender.titleLabel?.text == "Play"{
             preparePlayer()
+            timeLeft = totalTime
+            runTimer("Play")
             soundPlay.play()
             recordButton.isEnabled = false
             sender.setTitle("Stop", for: .normal)
         }
         else{
+            timeLeft = totalTime
+            timer.invalidate()
+            timerLabel.text = String(0)
             soundPlay.stop()
             sender.setTitle("Play", for: .normal)
             recordButton.isEnabled = true
@@ -140,16 +176,34 @@ class ViewController: UIViewController, AVAudioPlayerDelegate, AVAudioRecorderDe
     
     @IBAction func recordSession(_ sender: UIButton) {
         if sender.titleLabel?.text == "Record" {
+            setupRecorder()
+            timeLeft = totalTime
+            runTimer("Record")
             soundRecord.record()
             sender.setTitle("Stop", for: .normal)
             playButton.isEnabled = false
         }
         else{
+            timeLeft = totalTime
+            timer.invalidate()
+            timerLabel.text = String(0)
             soundRecord.stop()
             sender.setTitle("Record", for: .normal)
             playButton.isEnabled = true
         }
-        
     }
+        
+    @IBAction func increaseTimer(_ sender: UIButton) {
+        totalTime += 1
+        timerCounterLabel.text = String(totalTime)
+        timeLeft = totalTime
+    }
+    
+    @IBAction func decreaseTimer(_ sender: UIButton) {
+        totalTime -= 1
+        timerCounterLabel.text = String(totalTime)
+        timeLeft = totalTime
+    }
+    
 }
 
